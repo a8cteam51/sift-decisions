@@ -6,7 +6,9 @@ require_once __DIR__ . '/inc/wc-settings-tab.php';
 require_once __DIR__ . '/inc/rest-api-webhooks.php';
 require_once __DIR__ . '/inc/tracking-js.php';
 require_once __DIR__ . '/inc/woocommerce-actions.php';
-
+require_once __DIR__ . '/inc/payment-method.php';
+require_once __DIR__ . '/inc/payment-gateways/load.php';
+require_once __DIR__ . '/inc/sift-order.php';
 
 defined( 'ABSPATH' ) || exit;
 

@@ -2,6 +2,10 @@
 
 namespace WPCOMSpecialProjects\SiftDecisions\WooCommerce_Actions;
 
+use Payment_Gateway;
+use Payment_Method;
+use Sift_Order;
+
 /**
  * Class Events
  */
@@ -379,7 +383,7 @@ class Events {
 				'$amount'           => intval( $order->get_total() * 1000000 ), // Gotta multiply it up to give an integer.
 				'$currency_code'    => get_woocommerce_currency(),
 				'$billing_address'  => self::get_order_address( $user->ID, 'billing' ),
-				// '$payment_methods' => array(),
+				'$payment_methods'  => self::get_order_payment_methods( $order ),
 				'$shipping_address' => self::get_order_address( $user->ID, 'shipping' ),
 				'$items'            => $items,
 				'$shipping_method'  => $physical_or_electronic,
@@ -652,5 +656,10 @@ class Events {
 		$payment_methods = apply_filters( 'sift_get_customer_payment_methods', $payment_methods, $user_id );
 
 		return $payment_methods ?? null;
+	}
+
+	public static function get_order_payment_methods( \WC_Order $order ): array {
+		$sift_order = new Sift_Order( $order );
+		return $sift_order->get_payment_methods();
 	}
 }
