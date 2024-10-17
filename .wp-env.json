@@ -1,8 +1,8 @@
 {
   "plugins": [
     "https://downloads.wordpress.org/plugin/woocommerce.9.3.3.zip",
-    "./bin/test-payment-gateway",
-    "."
+    ".",
+    "./bin/test-payment-gateway"
   ],
   "lifecycleScripts": {
     "afterStart": "./bin/bootstrap-woocommerce.sh"

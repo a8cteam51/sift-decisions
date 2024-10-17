@@ -4,6 +4,8 @@
 
 namespace WPCOMSpecialProjects\SiftDecisions\WooCommerce_Actions;
 
+use WC_Order_Item_Product;
+
 /**
  * Class Events
  */
@@ -114,22 +116,24 @@ class Events {
 				$failure_reason = '$account_disabled';
 				break;
 			default:
-				$failure_reason = '$' . $error->get_error_code();
+				// Only other accepted failure reason is $account_suspended... We shouldn't set the failure reason.
+				$failure_reason = null;
+		}
+		$properties = array(
+			'$user_id'      => $attempted_user->ID ? $attempted_user->ID : null,
+			'$login_status' => '$failure',
+			'$session_id'   => WC()->session->get_customer_unique_id(),
+			'$browser'      => self::get_client_browser(), // alternately, `$app` for details of the app if not a browser.
+			'$username'     => $username,
+			'$ip'           => self::get_client_ip(),
+			'$time'         => intval( 1000 * microtime( true ) ),
+		);
+
+		if ( ! empty( $failure_reason ) ) {
+			$properties['$failure_reason'] = $failure_reason;
 		}
 
-		self::add(
-			'$login',
-			array(
-				'$user_id'        => $attempted_user->ID ? $attempted_user->ID : null,
-				'$login_status'   => '$failure',
-				'$session_id'     => WC()->session->get_customer_unique_id(),
-				'$browser'        => self::get_client_browser(), // alternately, `$app` for details of the app if not a browser.
-				'$username'       => $username,
-				'$failure_reason' => $failure_reason,
-				'$ip'             => self::get_client_ip(),
-				'$time'           => intval( 1000 * microtime( true ) ),
-			)
-		);
+		self::add( '$login', $properties );
 	}
 
 	/**
@@ -264,14 +268,19 @@ class Events {
 	 */
 	public static function add_to_cart( string $cart_item_key ) {
 		$cart_item = \WC()->cart->get_cart_item( $cart_item_key );
-		$product   = $cart_item['data'];
-		$user      = wp_get_current_user();
+		/** @var \WC_Abstract_Legacy_Product $product */
+		$product = $cart_item['data'] ?? null;
+		$user    = wp_get_current_user();
+
+		if ( ! $product ) {
+			return;
+		}
 
 		self::add(
 			'$add_item_to_cart',
 			array(
-				'$user_id'      => $user->ID ? $user->ID : null,
-				'$user_email'   => $user->user_email ? $user->user_email : null,
+				'$user_id'      => $user->ID ?? null,
+				'$user_email'   => $user->user_email ?? null,
 				'$session_id'   => \WC()->session->get_customer_unique_id(),
 				'$item'         => array(
 					'$item_id'       => $cart_item_key,
@@ -280,8 +289,8 @@ class Events {
 					'$price'         => $product->get_price() * 1000000, // $39.99
 					'$currency_code' => get_woocommerce_currency(),
 					'$quantity'      => $cart_item['quantity'],
-					'$category'      => $product->get_categories(),
-					'$tags'          => wp_list_pluck( get_the_terms( $product->ID, 'product_tag' ), 'name' ),
+					'$category'      => wc_get_product_category_list( $product->get_id() ),
+					'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
 				),
 				'$browser'      => self::get_client_browser(),
 				'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
@@ -320,8 +329,8 @@ class Events {
 					'$price'         => $product->get_price() * 1000000, // $39.99
 					'$currency_code' => get_woocommerce_currency(),
 					'$quantity'      => $cart_item['quantity'],
-					'$category'      => $product->get_categories(),
-					'$tags'          => wp_list_pluck( get_the_terms( $product->ID, 'product_tag' ), 'name' ),
+					'$category'      => wc_get_product_category_list( $product->get_id() ),
+					'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
 				),
 				'$browser'      => self::get_client_browser(),
 				'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
@@ -350,8 +359,18 @@ class Events {
 		$physical_or_electronic = '$electronic';
 		$items                  = array();
 		foreach ( $order->get_items( 'line_item' ) as $item ) {
+			if ( ! $item instanceof WC_Order_Item_Product ) {
+				// log an error...
+				wc_get_logger()->error( sprintf( 'Item not Item Product (order: %d).', $order->get_id() ) );
+				continue;
+			}
 			// Most of this we're basing off return value from `WC_Order_Item_Product::get_product()` as it will return the correct variation.
 			$product = $item->get_product();
+			if ( empty( $product ) ) {
+				// log an error...
+				wc_get_logger()->error( sprintf( 'Product not found for order %d.', $order->get_id() ) );
+				continue;
+			}
 
 			$items[] = array(
 				'$item_id'       => $product->get_id(),
@@ -360,7 +379,7 @@ class Events {
 				'$price'         => $product->get_price() * 1000000, // $39.99
 				'$currency_code' => $order->get_currency(), // For the order specifically, not the whole store.
 				'$quantity'      => $item->get_quantity(),
-				'$category'      => $product->get_categories(),
+				'$category'      => wc_get_product_category_list( $product->get_id() ),
 				'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
 			);
 

@@ -31,7 +31,8 @@ require_once "{$_tests_dir}/includes/functions.php";
  * Manually load the plugin being tested.
  */
 function _manually_load_plugin() {
-	require dirname( dirname( __FILE__ ) ) . '/sift-decisions.php';
+	require dirname( dirname( __DIR__ ) ) . '/woocommerce/woocommerce.php';
+	require dirname( __DIR__ ) . '/sift-decisions.php';
 }
 
 tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );
