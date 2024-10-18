@@ -121,6 +121,7 @@ class SiftDecisions {
 				array(
 					'api_key'    => $api_key,
 					'account_id' => $account_id,
+					'version'    => '205', // Hardcode this so new sift versions don't break us.
 				)
 			);
 		}
