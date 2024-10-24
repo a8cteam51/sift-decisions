@@ -5,6 +5,7 @@
 namespace WPCOMSpecialProjects\SiftDecisions\WooCommerce_Actions;
 
 use WC_Order_Item_Product;
+use WPCOMSpecialProjects\SiftDecisions\Sift\SiftObjectValidator;
 
 /**
  * Class Events
@@ -283,29 +284,43 @@ class Events {
 		if ( ! $product ) {
 			return;
 		}
+		// wc_get_product_category_list() lies it can return a boolean or WP_Error in addition to a string.
+		$category = wc_get_product_category_list( $product->get_id() );
+		if ( is_wp_error( $category ) || ! is_string( $category ) ) {
+			$category = '';
+		}
+
+		$properties = array(
+			'$user_id'      => $user->ID ?? null,
+			'$user_email'   => $user->user_email ?? null,
+			'$session_id'   => \WC()->session->get_customer_unique_id(),
+			'$item'         => array(
+				'$item_id'       => $cart_item_key,
+				'$sku'           => $product->get_sku(),
+				'$product_title' => $product->get_title(),
+				'$price'         => $product->get_price() * 1000000, // $39.99
+				'$currency_code' => get_woocommerce_currency(),
+				'$quantity'      => $cart_item['quantity'],
+				'$category'      => $category,
+				'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
+			),
+			'$browser'      => self::get_client_browser(),
+			'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
+			'$site_country' => wc_get_base_location()['country'],
+			'$ip'           => self::get_client_ip(),
+			'$time'         => intval( 1000 * microtime( true ) ),
+		);
+
+		try {
+			SiftObjectValidator::validate_add_item_to_cart( $properties );
+		} catch ( \Exception $e ) {
+			wc_get_logger()->error( esc_html( $e->getMessage() ) );
+			return;
+		}
 
 		self::add(
 			'$add_item_to_cart',
-			array(
-				'$user_id'      => $user->ID ?? null,
-				'$user_email'   => $user->user_email ?? null,
-				'$session_id'   => \WC()->session->get_customer_unique_id(),
-				'$item'         => array(
-					'$item_id'       => $cart_item_key,
-					'$sku'           => $product->get_sku(),
-					'$product_title' => $product->get_title(),
-					'$price'         => $product->get_price() * 1000000, // $39.99
-					'$currency_code' => get_woocommerce_currency(),
-					'$quantity'      => $cart_item['quantity'],
-					'$category'      => wc_get_product_category_list( $product->get_id() ),
-					'$tags'          => wp_list_pluck( get_the_terms( $product->get_id(), 'product_tag' ), 'name' ),
-				),
-				'$browser'      => self::get_client_browser(),
-				'$site_domain'  => wp_parse_url( site_url(), PHP_URL_HOST ),
-				'$site_country' => wc_get_base_location()['country'],
-				'$ip'           => self::get_client_ip(),
-				'$time'         => intval( 1000 * microtime( true ) ),
-			)
+			$properties
 		);
 	}
 
