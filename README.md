@@ -1,3 +1,5 @@
+_Note, this has been decommissioned in favor of [https://github.com/woocommerce/sift-for-woocommerce](https://github.com/woocommerce/sift-for-woocommerce)_
+
 # Sift Decisions
 
 This plugin will integrate with Sift Science's fraud detection suite and WooCommerce's decisions API.
